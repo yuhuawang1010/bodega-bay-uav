@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bodega Bay & Tomales Bay UAV Dataset Explorer (2019–2026)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --bg-dark: #102428;
+    --bg-panel: #163035;
+    --bg-card: #1d3d43;
+    --accent: #2ec492;
+    --accent-dim: #287761;
+    --amber: #f5b041;
+    --coral: #ff5a36;
+    --text: #eef5f5;
+    --muted: #9ab3b6;
+    --border: rgba(255,255,255,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #sidebar {
+    width: 355px;
+    min-width: 330px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 1000;
+  }
+  .header {
+    padding: 15px 18px 13px;
+    background: var(--bg-dark);
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 { font-size: 16px; font-weight: 700; color: #fff; }
+  .header p { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .badge-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .badge {
+    font-size: 10.5px; padding: 2px 7px; border-radius: 10px;
+    background: rgba(46,196,146,0.16); color: var(--accent);
+    border: 1px solid rgba(46,196,146,0.35); font-weight: 600;
+  }
+  .badge.lidar { background: rgba(255,90,54,0.16); color: #ff8569; border-color: rgba(255,90,54,0.4); }
+  .section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .section-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted); font-weight: 700; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .site-group-label { font-size: 10.5px; color: var(--accent); margin: 5px 0 5px; font-weight: 600; }
+  .site-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .btn {
+    background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 9px; font-size: 12px; cursor: pointer;
+    text-align: left; transition: all 0.15s ease;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .btn:hover:not(:disabled) { background: #244b52; border-color: rgba(46,196,146,0.5); }
+  .btn.active { background: var(--accent-dim); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn:disabled { opacity: 0.30; cursor: not-allowed; }
+  .btn-sm { padding: 5px 6px; font-size: 11px; text-align: center; justify-content: center; }
+  .tag-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-left: 4px; }
+  .tag-lidar { background: var(--coral); }
+  .tag-new { background: var(--amber); }
+  .tag-ms { background: #38bdf8; }
+
+  .year-pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 6px; }
+  .year-btn {
+    position: relative;
+    background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 6px 0; font-size: 12px; font-weight: 600;
+    cursor: pointer; text-align: center;
+  }
+  .year-btn:hover:not(:disabled) { border-color: var(--accent); }
+  .year-btn.active { background: var(--accent); color: #0b1c1f; border-color: var(--accent); }
+  .year-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+  .yr-ms-dot {
+    position: absolute; top: 3px; right: 4px;
+    width: 6px; height: 6px; border-radius: 50%; background: #38bdf8;
+    box-shadow: 0 0 4px rgba(56,189,248,0.8);
+  }
+  .year-btn.active .yr-ms-dot { background: #0b4f6c; box-shadow: none; }
+  .yr-multi-tag {
+    position: absolute; bottom: 1px; right: 3px;
+    font-size: 8.5px; font-weight: 700; opacity: 0.8;
+  }
+
+  #date-bar { margin: 6px 0 8px; }
+  .date-label { font-size: 10.5px; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .date-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .date-btn {
+    background: var(--bg-dark); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 8px; font-size: 11px; font-weight: 500; cursor: pointer;
+  }
+  .date-btn:hover { border-color: var(--accent); }
+  .date-btn.active { background: var(--accent-dim); border-color: var(--accent); color: #fff; font-weight: 700; }
+
+  .mode-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .control-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-top: 8px; font-size: 12px;
+  }
+  input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+  select {
+    background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 5px; padding: 5px 7px; font-size: 11.5px; width: 100%;
+  }
+
+  #custom-band-box {
+    display: none;
+    margin-top: 9px;
+    padding: 9px 10px;
+    background: var(--bg-dark);
+    border: 1px solid rgba(46,196,146,0.35);
+    border-radius: 7px;
+  }
+  .band-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px; }
+  .ch-pill {
+    width: 22px; height: 22px; border-radius: 4px; font-weight: 800; font-size: 11px;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .ch-r { background: #c0392b; color: #fff; }
+  .ch-g { background: #27ae60; color: #fff; }
+  .ch-b { background: #2980b9; color: #fff; }
+
+  .meta-card {
+    background: var(--bg-dark); border: 1px solid var(--border);
+    border-radius: 7px; padding: 10px 11px; font-size: 11.5px; line-height: 1.55;
+  }
+  .meta-row { display: flex; justify-content: space-between; gap: 8px; }
+  .meta-k { color: var(--muted); }
+  .meta-v { color: #fff; font-weight: 500; text-align: right; word-break: break-all; }
+
+  #map-wrap { flex: 1; position: relative; height: 100vh; }
+  #map { width: 100%; height: 100%; background: #141a1c; }
+
+  #swipe-line {
+    display: none; position: absolute; top: 0; bottom: 0; left: 50%;
+    width: 4px; margin-left: -2px; background: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.7);
+    z-index: 800; cursor: ew-resize;
+  }
+  #swipe-handle {
+    display: none; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent); color: #0b1c1f; font-weight: 800; font-size: 15px;
+    align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    z-index: 810; cursor: ew-resize; user-select: none;
+  }
+  .swipe-badge {
+    display: none; position: absolute; top: 14px; padding: 5px 11px; border-radius: 6px;
+    background: rgba(16,36,40,0.9); border: 1px solid var(--accent);
+    color: #fff; font-size: 12px; font-weight: 600; z-index: 805; pointer-events: none;
+  }
+  #badge-left { left: 56px; }
+  #badge-right { right: 16px; border-color: var(--amber); }
+
+  #ndvi-legend {
+    display: none; position: absolute; bottom: 24px; right: 16px;
+    background: rgba(16,36,40,0.92); border: 1px solid var(--border);
+    border-radius: 7px; padding: 9px 12px; z-index: 750; width: 205px; font-size: 11px;
+  }
+  .ndvi-bar {
+    height: 11px; border-radius: 3px; margin: 5px 0 3px;
+    background: linear-gradient(to right, #a50026, #f46d43, #fee08b, #a6d96a, #1a9850, #006837);
+  }
+  .ndvi-ticks { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; }
+
+  .toggle-label { display: flex; align-items: center; gap: 7px; font-size: 12px; cursor: pointer; }
+  .lidar-popup img { width: 240px; border-radius: 5px; margin-top: 6px; border: 1px solid #ccc; }
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="header">
+    <h1>Bodega Bay UAV Explorer</h1>
+    <p>UCSC GeoFly Lab · 2019–2026 Multi-Sensor Archive</p>
+    <div class="badge-row">
+      <span class="badge">7 Sites</span>
+      <span class="badge">89 Orthomosaics</span>
+      <span class="badge">10-Band MS Combiner</span>
+      <span class="badge lidar">2 Zenmuse L1 LiDAR</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <span>1. Survey Sites</span>
+      <button class="btn btn-sm" id="btn-all-sites">Zoom All</button>
+    </div>
+    <div class="site-group-label">Bodega Harbor</div>
+    <div class="site-grid" id="sites-bodega"></div>
+    <div class="site-group-label" style="margin-top:8px;">Tomales Bay</div>
+    <div class="site-grid" id="sites-tomales"></div>
+    <div style="font-size:10.5px; color:var(--muted); margin-top:7px; display:flex; gap:10px; flex-wrap:wrap;">
+      <span><span class="tag-dot tag-lidar" style="margin-left:0; margin-right:3px;"></span>2025 LiDAR</span>
+      <span><span class="tag-dot tag-ms" style="margin-left:0; margin-right:3px;"></span>Multispectral</span>
+      <span><span class="tag-dot tag-new" style="margin-left:0; margin-right:3px;"></span>New in 2026</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <span>2. Year, Date &amp; Time-Lapse</span>
+      <button class="btn btn-sm" id="btn-play">▶ Play</button>
+    </div>
+    <div class="year-pills" id="year-pills"></div>
+    <div style="font-size:10px; color:var(--muted); margin-bottom:6px;">
+      <span class="tag-dot tag-ms" style="margin-left:0; margin-right:3px;"></span>Has Multispectral (2023–24) &nbsp;·&nbsp; <b style="color:#cde;">×N</b> = multiple dates/flights
+    </div>
+    <div id="date-bar">
+      <div class="date-label"><span>Survey Date / Flight:</span><span id="date-count"></span></div>
+      <div class="date-pills" id="date-pills"></div>
+    </div>
+
+    <div class="section-title" style="margin-top:10px;"><span>3. Product / Band Mode</span></div>
+    <div class="mode-row" id="mode-row">
+      <button class="btn btn-sm active" data-mode="RGB">RGB</button>
+      <button class="btn btn-sm" data-mode="False-Color (NIR-R-G)">False-Color</button>
+      <button class="btn btn-sm" data-mode="NDVI">NDVI</button>
+      <button class="btn btn-sm" data-mode="Custom">Custom MS</button>
+    </div>
+
+    <div id="custom-band-box">
+      <div style="font-size:11px; color:var(--accent); font-weight:700; margin-bottom:6px;">
+        Multispectral Sensor &amp; Band Combiner
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:7px;">
+        <button class="btn btn-sm active" id="btn-sensor-mica">MicaSense (10-band)</button>
+        <button class="btn btn-sm" id="btn-sensor-m3m">Mavic 3M (5-band)</button>
+      </div>
+      <select id="preset-select">
+        <option value="cir">Preset: CIR False-Color (NIR / Red / Green)</option>
+        <option value="rgb">Preset: True Color RGB</option>
+        <option value="rededge">Preset: Red-Edge Highlight</option>
+        <option value="nir_re">Preset: NIR / Red-Edge / Red</option>
+        <option value="shallow">Preset: Shallow Water / Benthic (Mica only)</option>
+        <option value="ndvi">Index: NDVI = (NIR − Red) / (NIR + Red)</option>
+        <option value="ndre">Index: NDRE = (NIR − RedEdge) / (NIR + RedEdge)</option>
+        <option value="gndvi">Index: GNDVI = (NIR − Green) / (NIR + Green)</option>
+        <option value="custom">Custom R / G / B Selection</option>
+      </select>
+      <div id="rgb-pickers">
+        <div class="band-row"><span class="ch-pill ch-r">R</span><select id="band-r"></select></div>
+        <div class="band-row"><span class="ch-pill ch-g">G</span><select id="band-g"></select></div>
+        <div class="band-row"><span class="ch-pill ch-b">B</span><select id="band-b"></select></div>
+      </div>
+      <div id="custom-status" style="font-size:10.5px; color:var(--muted); margin-top:5px;"></div>
+    </div>
+
+    <div class="control-row">
+      <span style="color:var(--muted);">Opacity</span>
+      <input type="range" id="opacity-slider" min="0" max="1" step="0.05" value="0.95" />
+      <span id="opacity-val" style="width:32px; text-align:right;">95%</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">
+      <span>4. Split-Screen Swipe Compare</span>
+      <label class="toggle-label"><input type="checkbox" id="chk-swipe" /> Enable</label>
+    </div>
+    <div id="swipe-controls" style="display:none; margin-top:6px;">
+      <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">Right-side comparison layer:</div>
+      <select id="compare-select"></select>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span>5. Basemap &amp; LiDAR Tracks</span></div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <div class="control-row" style="margin-top:0;">
+        <span style="color:var(--muted);">Basemap</span>
+        <select id="basemap-select" style="width:215px;">
+          <option value="esri_dark" selected>Esri Dark Gray Canvas (Clean)</option>
+          <option value="esri_light">Esri Light Gray Canvas (Clean)</option>
+          <option value="esri_sat">Esri World Imagery (Satellite)</option>
+          <option value="esri_ocean">Esri Ocean Basemap</option>
+          <option value="none_dark">None — Pure Dark Canvas</option>
+          <option value="none_light">None — Pure Light Canvas</option>
+        </select>
+      </div>
+      <label class="toggle-label"><input type="checkbox" id="chk-lidar" /> Show 2025 Zenmuse L1 LiDAR Tracks</label>
+    </div>
+  </div>
+
+  <div class="section" style="border-bottom:none;">
+    <div class="section-title"><span>Active Layer Metadata</span></div>
+    <div class="meta-card" id="meta-card">Select a site and year to inspect metadata.</div>
+  </div>
+</aside>
+
+<main id="map-wrap">
+  <div id="map"></div>
+  <div id="swipe-line"></div>
+  <div id="swipe-handle">⇔</div>
+  <div class="swipe-badge" id="badge-left">Left</div>
+  <div class="swipe-badge" id="badge-right">Right</div>
+  <div id="ndvi-legend">
+    <div id="legend-title" style="font-weight:700; color:#fff;">NDVI (NIR − Red) / (NIR + Red)</div>
+    <div class="ndvi-bar"></div>
+    <div class="ndvi-ticks"><span>-0.35 (Water)</span><span>0.20</span><span>0.75 (Dense)</span></div>
+  </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="layers_data.js"></script>
+<script>
+const DATA = window.BB_DATA;
+const YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+const MICA_BANDS = DATA.mica_bands || [
+  ["b1","B1: Blue-444 (444 nm)"],["b2","B2: Blue (475 nm)"],["b3","B3: Green-531 (531 nm)"],
+  ["b4","B4: Green (560 nm)"],["b5","B5: Red-650 (650 nm)"],["b6","B6: Red (668 nm)"],
+  ["b7","B7: RedEdge-705 (705 nm)"],["b8","B8: RedEdge-717 (717 nm)"],["b9","B9: RedEdge-740 (740 nm)"],
+  ["b10","B10: NIR (842 nm)"]
+];
+
+const msCache = {}; // key -> {width, height, bounds, pixels: {b1: Uint8Array, ..., alpha: Uint8Array}}
+const pendingCallbacks = {};
+
+window.onMSBandsLoaded = function(payload) {
+  const key = payload.key;
+  const w = payload.width, h = payload.height;
+  const bandKeys = Object.keys(payload.bands);
+  const decoded = {};
+  let remaining = bandKeys.length;
+  const tmpCanvas = document.createElement("canvas");
+  tmpCanvas.width = w; tmpCanvas.height = h;
+  const ctx = tmpCanvas.getContext("2d", { willReadFrequently: true });
+
+  bandKeys.forEach(bk => {
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const rgba = ctx.getImageData(0, 0, w, h).data;
+      const gray = new Uint8Array(w * h);
+      for (let i = 0, j = 0; i < gray.length; i++, j += 4) gray[i] = rgba[j];
+      decoded[bk] = gray;
+      remaining--;
+      if (remaining === 0) {
+        msCache[key] = {
+          width: w, height: h, bounds: payload.bounds, pixels: decoded,
+          band_labels: payload.band_labels, sensor_name: payload.sensor_name,
+          nir_band: payload.nir_band, red_band: payload.red_band,
+          re_band: payload.re_band, green_band: payload.green_band,
+          presets: payload.presets
+        };
+        if (pendingCallbacks[key]) {
+          pendingCallbacks[key].forEach(fn => fn(msCache[key]));
+          delete pendingCallbacks[key];
+        }
+      }
+    };
+    img.src = payload.bands[bk];
+  });
+};
+
+function slug(s) { return s.toLowerCase().replace(/'/g, "").replace(/ /g, "_"); }
+
+function bundleKey(site, year, sensor) { return `${slug(site)}_${year}_${sensor}`; }
+function hasSensorBundle(site, year, sensor) { return Boolean(DATA.ms_bundles && DATA.ms_bundles[bundleKey(site, year, sensor)]); }
+function hasMSBundle(site, year) { return hasSensorBundle(site, year, "mica") || hasSensorBundle(site, year, "m3m"); }
+
+function loadMSBundle(site, year, sensor, cb) {
+  const key = bundleKey(site, year, sensor);
+  if (msCache[key]) { cb(msCache[key]); return; }
+  const src = DATA.ms_bundles && DATA.ms_bundles[key];
+  if (!src) { cb(null); return; }
+  if (!pendingCallbacks[key]) {
+    pendingCallbacks[key] = [cb];
+    const sc = document.createElement("script");
+    sc.src = src;
+    document.body.appendChild(sc);
+  } else {
+    pendingCallbacks[key].push(cb);
+  }
+}
+
+// RdYlGn color ramp for live NDVI / NDRE / GNDVI
+const RAMP = [
+  [165,0,38],[215,48,39],[244,109,67],[253,174,97],[254,224,139],
+  [217,239,139],[166,217,106],[102,189,99],[26,152,80],[0,104,55]
+];
+function rampColor(t) {
+  const cl = Math.max(0, Math.min(1, t)) * (RAMP.length - 1);
+  const i0 = Math.floor(cl), i1 = Math.min(RAMP.length - 1, i0 + 1);
+  const f = cl - i0;
+  return [
+    Math.round(RAMP[i0][0] + (RAMP[i1][0] - RAMP[i0][0]) * f),
+    Math.round(RAMP[i0][1] + (RAMP[i1][1] - RAMP[i0][1]) * f),
+    Math.round(RAMP[i0][2] + (RAMP[i1][2] - RAMP[i0][2]) * f)
+  ];
+}
+
+function renderCustomComposite(bundle, preset, rBand, gBand, bBand) {
+  const { width: w, height: h, pixels } = bundle;
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  const out = ctx.createImageData(w, h);
+  const d = out.data;
+  const alpha = pixels.alpha;
+
+  if (preset === "ndvi" || preset === "ndre" || preset === "gndvi") {
+    // Use exact pre-computed raw-radiometry index (encoded linearly [-0.5, 1.0] -> [0, 255])
+    const idxKey = "idx_" + preset;
+    const rawArr = pixels[idxKey];
+    for (let i = 0, j = 0; i < alpha.length; i++, j += 4) {
+      if (alpha[i] === 0) { d[j+3] = 0; continue; }
+      const val = -0.5 + (rawArr[i] / 255.0) * 1.5;
+      const t = (val - (-0.35)) / (0.75 - (-0.35));
+      const [r, g, b] = rampColor(t);
+      d[j] = r; d[j+1] = g; d[j+2] = b; d[j+3] = 255;
+    }
+  } else {
+    const R = pixels[rBand] || pixels.b1, G = pixels[gBand] || pixels.b2, B = pixels[bBand] || pixels.b3;
+    for (let i = 0, j = 0; i < alpha.length; i++, j += 4) {
+      d[j] = R[i]; d[j+1] = G[i]; d[j+2] = B[i]; d[j+3] = alpha[i];
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+  return c.toDataURL("image/png");
+}
+
+let state = {
+  site: "Westside",
+  year: 2026,
+  variant: null,
+  mode: "RGB",
+  msSensor: "m3m",
+  preset: "cir",
+  rBand: "b10", gBand: "b6", bBand: "b4",
+  opacity: 0.95,
+  swipe: false,
+  swipePct: 50,
+  compareId: null,
+  playing: false,
+  playTimer: null,
+};
+
+function populateBandDropdowns(sensor) {
+  const list = (sensor === "m3m") ? (DATA.m3m_bands || []) : MICA_BANDS;
+  ["band-r", "band-g", "band-b"].forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = "";
+    list.forEach(([k, lbl]) => {
+      const opt = document.createElement("option");
+      opt.value = k; opt.textContent = lbl;
+      sel.appendChild(opt);
+    });
+  });
+  // Apply current preset mapping for this sensor
+  const sensorPresets = (sensor === "m3m")
+    ? { rgb: ["b1","b2","b3"], cir: ["b7","b5","b4"], rededge: ["b6","b5","b4"], nir_re: ["b7","b6","b5"], shallow: ["b1","b2","b3"] }
+    : { rgb: ["b6","b4","b2"], cir: ["b10","b6","b4"], rededge: ["b9","b7","b4"], nir_re: ["b10","b8","b6"], shallow: ["b3","b2","b1"] };
+  const validKeys = new Set(list.map(x => x[0]));
+  if (sensorPresets[state.preset]) {
+    [state.rBand, state.gBand, state.bBand] = sensorPresets[state.preset];
+  } else if (!validKeys.has(state.rBand) || !validKeys.has(state.gBand) || !validKeys.has(state.bBand)) {
+    [state.rBand, state.gBand, state.bBand] = sensorPresets.cir;
+  }
+  document.getElementById("band-r").value = state.rBand;
+  document.getElementById("band-g").value = state.gBand;
+  document.getElementById("band-b").value = state.bBand;
+}
+populateBandDropdowns("mica");
+
+// Initialize Map
+const map = L.map("map", { zoomControl: true, maxZoom: 21 }).setView([38.23, -122.97], 11);
+map.createPane("leftOverlay").style.zIndex = 410;
+map.createPane("rightOverlay").style.zIndex = 420;
+map.createPane("lidarPane").style.zIndex = 450;
+
+const basemaps = {
+  esri_dark: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 20, maxNativeZoom: 16, attribution: "Esri Dark Gray Canvas"
+  }),
+  esri_light: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 20, maxNativeZoom: 16, attribution: "Esri Light Gray Canvas"
+  }),
+  esri_sat: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 20, attribution: "Esri World Imagery"
+  }),
+  esri_ocean: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 20, maxNativeZoom: 13, attribution: "Esri Ocean Basemap"
+  }),
+  none_dark: null,
+  none_light: null,
+};
+let curBasemap = basemaps.esri_dark.addTo(map);
+
+let leftLayer = null;
+let rightLayer = null;
+const lidarGroup = L.layerGroup(); // unchecked by default for clean map
+
+// Build LiDAR Flight Tracks
+DATA.lidar.forEach(ld => {
+  const poly = L.polyline(ld.trajectory, {
+    pane: "lidarPane", color: "#ff5a36", weight: 2.5, opacity: 0.9
+  });
+  const html = `
+    <div class="lidar-popup" style="color:#19383D; font-size:12px;">
+      <b style="font-size:13px;">${ld.id} — ${ld.site}</b><br>
+      <b>Date:</b> ${ld.date} | <b>Sensor:</b> Zenmuse L1<br>
+      <b>Raw .LDR:</b> ${ld.ldr_size_gb} GB | <b>RTK Events:</b> ${ld.num_mrk_points}<br>
+      <b>RGB Frames:</b> ${ld.num_jpgs} | <b>Alt:</b> ~${ld.alt_range_m[0]} m<br>
+      <span style="color:#985E28; font-size:11px;">Status: Raw mission archive only (no LAS/DSM yet; ready for DJI Terra).</span><br>
+      <img src="${ld.sample_img}" alt="LiDAR sample" />
+    </div>`;
+  poly.bindPopup(html, { maxWidth: 270 });
+  poly.addTo(lidarGroup);
+
+  L.circleMarker(ld.center, {
+    pane: "lidarPane", radius: 6, color: "#fff", fillColor: "#ff5a36", fillOpacity: 1, weight: 2
+  }).bindPopup(html, { maxWidth: 270 }).addTo(lidarGroup);
+});
+
+function renderSites() {
+  const bodegaEl = document.getElementById("sites-bodega");
+  const tomalesEl = document.getElementById("sites-tomales");
+  bodegaEl.innerHTML = ""; tomalesEl.innerHTML = "";
+  DATA.sites.forEach(s => {
+    const btn = document.createElement("button");
+    btn.className = "btn" + (state.site === s.name ? " active" : "");
+    let dots = "";
+    if (s.has_lidar) dots += '<span class="tag-dot tag-lidar" title="2025 LiDAR"></span>';
+    if (s.has_ms) dots += '<span class="tag-dot tag-ms" title="2023–2024 Multispectral"></span>';
+    if (s.name === "Lawson's Landing") dots += '<span class="tag-dot tag-new" title="New 2026"></span>';
+    btn.innerHTML = `<span>${s.name}</span><span style="white-space:nowrap;">${dots}</span>`;
+    btn.onclick = () => selectSite(s.name, true);
+    (s.region === "Bodega Harbor" ? bodegaEl : tomalesEl).appendChild(btn);
+  });
+}
+
+function getAvailableLayers(site) { return DATA.layers.filter(l => l.site === site); }
+function findLayers(site, year, mode) { return DATA.layers.filter(l => l.site === site && l.year === year && l.mode === mode); }
+function findLayer(site, year, mode) {
+  const matches = findLayers(site, year, mode);
+  if (!matches.length) return null;
+  if (state.variant) {
+    const exact = matches.find(m => m.variant_label === state.variant);
+    if (exact) return exact;
+  }
+  // Prefer summer (non-Feb) and 400ft as default when switching years
+  const pref = matches.find(m => !m.date.startsWith("02/") && !m.variant_label.includes("200ft"));
+  return pref || matches[matches.length - 1];
+}
+
+function renderYears() {
+  const el = document.getElementById("year-pills");
+  el.innerHTML = "";
+  const avail = new Set(
+    state.mode === "Custom"
+      ? YEARS.filter(y => hasMSBundle(state.site, y))
+      : DATA.layers.filter(l => l.site === state.site && l.mode === state.mode).map(l => l.year)
+  );
+  YEARS.forEach(y => {
+    const btn = document.createElement("button");
+    btn.className = "year-btn" + (state.year === y ? " active" : "");
+    const hasMS = hasMSBundle(state.site, y);
+    const cnt = (state.mode === "Custom") ? (hasMS ? 1 : 0) : findLayers(state.site, y, state.mode).length;
+    let extra = "";
+    if (hasMS) extra += '<span class="yr-ms-dot" title="Multispectral available"></span>';
+    if (cnt > 1) extra += `<span class="yr-multi-tag">×${cnt}</span>`;
+    btn.innerHTML = `${y}${extra}`;
+    btn.disabled = !avail.has(y);
+    btn.onclick = () => { stopPlay(); state.year = y; state.variant = null; updateAll(); };
+    el.appendChild(btn);
+  });
+}
+
+function renderDatePills() {
+  const bar = document.getElementById("date-bar");
+  const el = document.getElementById("date-pills");
+  const cntEl = document.getElementById("date-count");
+  el.innerHTML = "";
+  const lookupMode = (state.mode === "Custom") ? "False-Color (NIR-R-G)" : state.mode;
+  const matches = findLayers(state.site, state.year, lookupMode);
+  if (!matches.length) {
+    bar.style.display = "none";
+    return;
+  }
+  bar.style.display = "block";
+  const activeObj = findLayer(state.site, state.year, lookupMode);
+  if (activeObj) state.variant = activeObj.variant_label;
+  cntEl.textContent = matches.length > 1 ? `${matches.length} flights available` : "1 flight";
+  matches.forEach(m => {
+    const btn = document.createElement("button");
+    btn.className = "date-btn" + (m.variant_label === state.variant ? " active" : "");
+    btn.textContent = m.variant_label;
+    btn.title = m.filename;
+    btn.onclick = () => { stopPlay(); state.variant = m.variant_label; updateAll(); };
+    el.appendChild(btn);
+  });
+}
+
+function renderCompareDropdown() {
+  const sel = document.getElementById("compare-select");
+  const layers = getAvailableLayers(state.site);
+  sel.innerHTML = "";
+  layers.forEach(l => {
+    const opt = document.createElement("option");
+    opt.value = l.id;
+    opt.textContent = `${l.year} ${l.variant_label || l.date || ""} — ${l.mode}`;
+    sel.appendChild(opt);
+  });
+  if (!layers.find(l => l.id === state.compareId)) {
+    const ndvi = layers.find(l => l.mode === "NDVI");
+    const earliest = layers[0];
+    state.compareId = (state.mode === "RGB" && earliest && earliest.year !== state.year) ? earliest.id : (ndvi ? ndvi.id : (layers[0] ? layers[0].id : null));
+  }
+  if (state.compareId) sel.value = state.compareId;
+}
+
+function applySwipeClip() {
+  const line = document.getElementById("swipe-line");
+  const handle = document.getElementById("swipe-handle");
+  const bL = document.getElementById("badge-left");
+  const bR = document.getElementById("badge-right");
+  const lEl = leftLayer ? leftLayer.getElement() : null;
+  const rEl = rightLayer ? rightLayer.getElement() : null;
+
+  if (!state.swipe || !rightLayer) {
+    if (lEl) lEl.style.clipPath = "none";
+    if (rEl) rEl.style.clipPath = "none";
+    line.style.display = "none"; handle.style.display = "none";
+    bL.style.display = "none"; bR.style.display = "none";
+    return;
+  }
+  const wrap = document.getElementById("map-wrap");
+  const wrapRect = wrap.getBoundingClientRect();
+  const xPx = Math.round(wrapRect.width * (state.swipePct / 100));
+  const splitScreenX = wrapRect.left + xPx;
+
+  line.style.display = "block"; line.style.left = xPx + "px";
+  handle.style.display = "flex"; handle.style.left = xPx + "px";
+  bL.style.display = "block"; bR.style.display = "block";
+
+  if (rEl) {
+    const rr = rEl.getBoundingClientRect();
+    if (rr.width > 0) {
+      const cutL = Math.max(0, Math.min(rr.width, splitScreenX - rr.left));
+      rEl.style.clipPath = `inset(0px 0px 0px ${(cutL / rr.width * 100).toFixed(3)}%)`;
+    }
+  }
+  if (lEl) {
+    const lr = lEl.getBoundingClientRect();
+    if (lr.width > 0) {
+      const cutR = Math.max(0, Math.min(lr.width, lr.right - splitScreenX));
+      lEl.style.clipPath = `inset(0px ${(cutR / lr.width * 100).toFixed(3)}% 0px 0px)`;
+    }
+  }
+}
+map.on("move zoom zoomend viewreset resize", applySwipeClip);
+
+function updateMetaCard(layerObj, customLabel=null) {
+  if (!layerObj) return;
+  document.getElementById("meta-card").innerHTML = `
+    <div class="meta-row"><span class="meta-k">Site</span><span class="meta-v">${layerObj.site}</span></div>
+    <div class="meta-row"><span class="meta-k">Year / Date</span><span class="meta-v">${layerObj.year} (${layerObj.date || "—"})</span></div>
+    <div class="meta-row"><span class="meta-k">Product</span><span class="meta-v">${customLabel || layerObj.mode}</span></div>
+    <div class="meta-row"><span class="meta-k">Sensor</span><span class="meta-v">${layerObj.sensor}</span></div>
+    <div class="meta-row"><span class="meta-k">Resolution</span><span class="meta-v">${layerObj.gsd_cm ? layerObj.gsd_cm + " cm/px" : "—"}</span></div>
+    <div class="meta-row"><span class="meta-k">GeoTIFF Size</span><span class="meta-v">${layerObj.size_mb ? layerObj.size_mb + " MB" : "—"}</span></div>
+    <div class="meta-row" style="margin-top:4px; border-top:1px solid rgba(255,255,255,0.08); padding-top:4px;">
+      <span class="meta-k">File</span><span class="meta-v" style="font-size:10.5px;">${layerObj.filename}</span>
+    </div>`;
+}
+
+function updateMapLayers() {
+  if (leftLayer) { map.removeLayer(leftLayer); leftLayer = null; }
+  if (rightLayer) { map.removeLayer(rightLayer); rightLayer = null; }
+
+  let showLegend = false;
+  let legendTitle = "NDVI = (NIR − Red) / (NIR + Red)";
+
+  if (state.mode === "Custom") {
+    if (!hasMSBundle(state.site, state.year)) {
+      const availY = YEARS.filter(y => hasMSBundle(state.site, y));
+      if (availY.length) state.year = availY[availY.length - 1];
+      else state.mode = "RGB";
+    }
+  }
+
+  document.getElementById("custom-band-box").style.display = (state.mode === "Custom") ? "block" : "none";
+
+  if (state.mode === "Custom") {
+    const hasMica = hasSensorBundle(state.site, state.year, "mica");
+    const hasM3M = hasSensorBundle(state.site, state.year, "m3m");
+    if (state.msSensor === "m3m" && !hasM3M) state.msSensor = "mica";
+    if (state.msSensor === "mica" && !hasMica && hasM3M) state.msSensor = "m3m";
+
+    const btnMica = document.getElementById("btn-sensor-mica");
+    const btnM3M = document.getElementById("btn-sensor-m3m");
+    btnMica.disabled = !hasMica;
+    btnM3M.disabled = !hasM3M;
+    btnMica.classList.toggle("active", state.msSensor === "mica");
+    btnM3M.classList.toggle("active", state.msSensor === "m3m");
+    populateBandDropdowns(state.msSensor);
+
+    const st = document.getElementById("custom-status");
+    st.textContent = `Loading ${state.msSensor === "m3m" ? "Mavic 3M (5-band)" : "MicaSense (10-band)"}...`;
+    const metaRef = findLayer(state.site, state.year, "False-Color (NIR-R-G)") || findLayer(state.site, state.year, "RGB");
+    loadMSBundle(state.site, state.year, state.msSensor, bundle => {
+      if (!bundle || state.mode !== "Custom") return;
+      const dataUrl = renderCustomComposite(bundle, state.preset, state.rBand, state.gBand, state.bBand);
+      if (leftLayer) map.removeLayer(leftLayer);
+      const b = [[bundle.bounds[0], bundle.bounds[1]], [bundle.bounds[2], bundle.bounds[3]]];
+      leftLayer = L.imageOverlay(dataUrl, b, { opacity: state.opacity, pane: "leftOverlay" }).addTo(map);
+
+      let lbl = `${bundle.sensor_name} (${state.rBand.toUpperCase()}/${state.gBand.toUpperCase()}/${state.bBand.toUpperCase()})`;
+      if (state.preset === "ndvi") { lbl = `${bundle.sensor_name} — NDVI`; showLegend = true; legendTitle = "NDVI = (NIR − Red) / (NIR + Red)"; }
+      else if (state.preset === "ndre") { lbl = `${bundle.sensor_name} — NDRE`; showLegend = true; legendTitle = "NDRE = (NIR − RedEdge) / (NIR + RedEdge)"; }
+      else if (state.preset === "gndvi") { lbl = `${bundle.sensor_name} — GNDVI`; showLegend = true; legendTitle = "GNDVI = (NIR − Green) / (NIR + Green)"; }
+      st.textContent = `Rendered: ${lbl}`;
+      document.getElementById("badge-left").textContent = `Left: ${state.year} ${lbl}`;
+      updateMetaCard(metaRef, lbl);
+      document.getElementById("legend-title").textContent = legendTitle;
+      document.getElementById("ndvi-legend").style.display = showLegend ? "block" : "none";
+      applySwipeClip();
+    });
+  } else {
+    let layerObj = findLayer(state.site, state.year, state.mode);
+    if (!layerObj) {
+      const cands = DATA.layers.filter(l => l.site === state.site && l.mode === state.mode);
+      if (cands.length) { layerObj = cands[cands.length - 1]; state.year = layerObj.year; }
+      else {
+        state.mode = "RGB";
+        const rgbCands = DATA.layers.filter(l => l.site === state.site && l.mode === "RGB");
+        layerObj = rgbCands[rgbCands.length - 1];
+        if (layerObj) state.year = layerObj.year;
+      }
+    }
+    if (layerObj) {
+      const b = [[layerObj.bounds[0], layerObj.bounds[1]], [layerObj.bounds[2], layerObj.bounds[3]]];
+      leftLayer = L.imageOverlay(layerObj.img, b, { opacity: state.opacity, pane: "leftOverlay" }).addTo(map);
+      document.getElementById("badge-left").textContent = `Left: ${layerObj.year} ${layerObj.variant_label || ""} ${layerObj.mode}`;
+      updateMetaCard(layerObj);
+      if (layerObj.mode === "NDVI") showLegend = true;
+    }
+  }
+
+  if (state.swipe && state.compareId) {
+    const rObj = DATA.layers.find(l => l.id === state.compareId);
+    if (rObj) {
+      const rb = [[rObj.bounds[0], rObj.bounds[1]], [rObj.bounds[2], rObj.bounds[3]]];
+      rightLayer = L.imageOverlay(rObj.img, rb, { opacity: state.opacity, pane: "rightOverlay" }).addTo(map);
+      document.getElementById("badge-right").textContent = `Right: ${rObj.year} ${rObj.variant_label || ""} ${rObj.mode}`;
+      if (rObj.mode === "NDVI") showLegend = true;
+    }
+  }
+
+  document.getElementById("legend-title").textContent = legendTitle;
+  document.getElementById("ndvi-legend").style.display = showLegend ? "block" : "none";
+  requestAnimationFrame(applySwipeClip);
+}
+
+function updateModeButtons() {
+  document.querySelectorAll("#mode-row button").forEach(btn => {
+    const m = btn.dataset.mode;
+    const has = (m === "Custom")
+      ? YEARS.some(y => hasMSBundle(state.site, y))
+      : DATA.layers.some(l => l.site === state.site && l.mode === m);
+    btn.disabled = !has;
+    btn.classList.toggle("active", state.mode === m);
+  });
+}
+
+function updateAll() {
+  renderSites();
+  updateModeButtons();
+  renderYears();
+  renderDatePills();
+  renderCompareDropdown();
+  updateMapLayers();
+}
+
+function selectSite(name, fly=true) {
+  stopPlay();
+  state.site = name;
+  state.variant = null;
+  updateAll();
+  const s = DATA.sites.find(x => x.name === name);
+  if (s && fly) {
+    const b = [[s.bounds[0], s.bounds[1]], [s.bounds[2], s.bounds[3]]];
+    map.flyToBounds(b, { padding: [45, 45], duration: 0.85 });
+  }
+}
+
+function stopPlay() {
+  if (state.playTimer) { clearInterval(state.playTimer); state.playTimer = null; }
+  state.playing = false;
+  document.getElementById("btn-play").textContent = "▶ Play";
+}
+
+// Event Listeners
+document.getElementById("btn-all-sites").onclick = () => {
+  const allBounds = DATA.sites.map(s => [[s.bounds[0], s.bounds[1]], [s.bounds[2], s.bounds[3]]]).flat();
+  map.flyToBounds(allBounds, { padding: [35, 35], duration: 0.85 });
+};
+
+  document.querySelectorAll("#mode-row button").forEach(btn => {
+    btn.onclick = () => {
+      if (btn.disabled) return;
+      stopPlay();
+      state.mode = btn.dataset.mode;
+      state.variant = null;
+      const avail = (state.mode === "Custom")
+        ? YEARS.filter(y => hasMSBundle(state.site, y))
+        : DATA.layers.filter(l => l.site === state.site && l.mode === state.mode).map(l => l.year);
+      if (!avail.includes(state.year) && avail.length) state.year = avail[avail.length - 1];
+      updateAll();
+    };
+  });
+
+document.getElementById("btn-sensor-mica").onclick = () => {
+  if (document.getElementById("btn-sensor-mica").disabled) return;
+  state.msSensor = "mica";
+  updateMapLayers();
+};
+document.getElementById("btn-sensor-m3m").onclick = () => {
+  if (document.getElementById("btn-sensor-m3m").disabled) return;
+  state.msSensor = "m3m";
+  updateMapLayers();
+};
+
+document.getElementById("preset-select").onchange = e => {
+  state.preset = e.target.value;
+  const isIndex = (state.preset === "ndvi" || state.preset === "ndre" || state.preset === "gndvi");
+  document.getElementById("rgb-pickers").style.display = isIndex ? "none" : "block";
+  populateBandDropdowns(state.msSensor);
+  updateMapLayers();
+};
+["band-r", "band-g", "band-b"].forEach((id, idx) => {
+  document.getElementById(id).onchange = e => {
+    if (idx === 0) state.rBand = e.target.value;
+    if (idx === 1) state.gBand = e.target.value;
+    if (idx === 2) state.bBand = e.target.value;
+    state.preset = "custom";
+    document.getElementById("preset-select").value = "custom";
+    updateMapLayers();
+  };
+});
+
+document.getElementById("opacity-slider").oninput = e => {
+  state.opacity = parseFloat(e.target.value);
+  document.getElementById("opacity-val").textContent = Math.round(state.opacity * 100) + "%";
+  if (leftLayer) leftLayer.setOpacity(state.opacity);
+  if (rightLayer) rightLayer.setOpacity(state.opacity);
+};
+
+document.getElementById("chk-swipe").onchange = e => {
+  state.swipe = e.target.checked;
+  document.getElementById("swipe-controls").style.display = state.swipe ? "block" : "none";
+  updateMapLayers();
+};
+
+document.getElementById("compare-select").onchange = e => {
+  state.compareId = e.target.value;
+  updateMapLayers();
+};
+
+document.getElementById("chk-lidar").onchange = e => {
+  if (e.target.checked) lidarGroup.addTo(map); else map.removeLayer(lidarGroup);
+};
+
+document.getElementById("basemap-select").onchange = e => {
+  if (curBasemap) { map.removeLayer(curBasemap); curBasemap = null; }
+  const val = e.target.value;
+  const mapEl = document.getElementById("map");
+  if (val === "none_dark") { mapEl.style.background = "#10181b"; }
+  else if (val === "none_light") { mapEl.style.background = "#eef2f2"; }
+  else {
+    mapEl.style.background = "#141a1c";
+    curBasemap = basemaps[val].addTo(map);
+  }
+};
+
+document.getElementById("btn-play").onclick = () => {
+  if (state.playing) { stopPlay(); return; }
+  let seq = [];
+  if (state.mode === "Custom") {
+    seq = YEARS.filter(y => hasMSBundle(state.site, y)).map(y => ({ year: y, variant: null }));
+  } else {
+    // Step chronologically through EVERY survey date/flight (e.g., 2020 06/21 -> 07/21 -> 08/03 -> 2021...)
+    seq = DATA.layers
+      .filter(l => l.site === state.site && l.mode === state.mode)
+      .sort((a, b) => (a.year - b.year) || (a.date || "").localeCompare(b.date || "") || (a.variant_label || "").localeCompare(b.variant_label || ""))
+      .map(l => ({ year: l.year, variant: l.variant_label }));
+  }
+  if (seq.length < 2) return;
+  state.playing = true;
+  document.getElementById("btn-play").textContent = "⏸ Pause";
+  let idx = seq.findIndex(item => item.year === state.year && (!item.variant || item.variant === state.variant));
+  if (idx < 0) idx = 0;
+  state.playTimer = setInterval(() => {
+    idx = (idx + 1) % seq.length;
+    state.year = seq[idx].year;
+    state.variant = seq[idx].variant;
+    updateAll();
+  }, 1300);
+};
+
+const handle = document.getElementById("swipe-handle");
+const swipeLine = document.getElementById("swipe-line");
+let dragging = false;
+const startDrag = e => { e.preventDefault(); dragging = true; map.dragging.disable(); };
+handle.onmousedown = startDrag;
+swipeLine.onmousedown = startDrag;
+window.onmouseup = () => { if (dragging) { dragging = false; map.dragging.enable(); } };
+window.onmousemove = e => {
+  if (!dragging) return;
+  const rect = document.getElementById("map-wrap").getBoundingClientRect();
+  let pct = ((e.clientX - rect.left) / rect.width) * 100;
+  state.swipePct = Math.max(5, Math.min(95, pct));
+  applySwipeClip();
+};
+
+selectSite("Westside", true);
+</script>
+</body>
+</html>
